@@ -29,6 +29,8 @@ export class TasksComponent implements OnInit {
   listOptionsEditor: any = {};
   itemDetailsEditor: any = {};
   newItemTitle = '';
+  newItemDueDate = '';
+  newItemError = '';
   addingItem = signal(false);
   private originalTitle = '';
 
@@ -36,7 +38,12 @@ export class TasksComponent implements OnInit {
     private listsClient: TodoListsClient,
     private itemsClient: TodoItemsClient
   ) {
-    effect(() => { this.selectedListId(); this.newItemTitle = ''; this.addingItem.set(false); });
+    effect(() => {
+      this.selectedListId();
+      this.newItemTitle = '';
+      this.newItemDueDate = '';
+      this.addingItem.set(false);
+    });
   }
 
   ngOnInit(): void {
@@ -151,6 +158,15 @@ export class TasksComponent implements OnInit {
   showItemDetailsDialog(item: TodoItemDto): void {
     this.selectedItem.set(item);
     this.itemDetailsEditor = { ...item };
+    if (item.dueDate) {
+      const d = new Date(item.dueDate);
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      this.itemDetailsEditor.dueDateInput = `${y}-${m}-${day}`;
+    } else {
+      this.itemDetailsEditor.dueDateInput = '';
+    }
     this.itemDetailsDialogRef.nativeElement.showModal();
   }
 
@@ -162,6 +178,13 @@ export class TasksComponent implements OnInit {
 
   updateItemDetails(): void {
     const currentItem = this.selectedItem()!;
+    let dueDate: Date | undefined;
+    const raw = this.itemDetailsEditor.dueDateInput;
+    if (raw) {
+      dueDate = new Date(raw + 'T00:00:00');
+    }
+    this.itemDetailsEditor.dueDate = dueDate;
+
     const isMoving = currentItem.listId !== this.itemDetailsEditor.listId;
     this.itemsClient.updateTodoItemDetail(currentItem.id, this.itemDetailsEditor as UpdateTodoItemDetailCommand).subscribe({
       next: () => {
@@ -170,12 +193,12 @@ export class TasksComponent implements OnInit {
             return { ...l, items: l.items.filter(i => i.id !== currentItem.id) } as TodoListDto;
           }
           if (l.id === this.itemDetailsEditor.listId && isMoving) {
-            const moved = { ...currentItem, listId: this.itemDetailsEditor.listId, priority: this.itemDetailsEditor.priority, note: this.itemDetailsEditor.note } as TodoItemDto;
+            const moved = { ...currentItem, listId: this.itemDetailsEditor.listId, priority: this.itemDetailsEditor.priority, note: this.itemDetailsEditor.note, dueDate: this.itemDetailsEditor.dueDate } as TodoItemDto;
             return { ...l, items: [...l.items, moved] } as TodoListDto;
           }
           if (l.id === currentItem.listId) {
             return { ...l, items: l.items.map(i => i.id === currentItem.id
-              ? { ...i, priority: this.itemDetailsEditor.priority, note: this.itemDetailsEditor.note } as TodoItemDto
+              ? { ...i, priority: this.itemDetailsEditor.priority, note: this.itemDetailsEditor.note, dueDate: this.itemDetailsEditor.dueDate } as TodoItemDto
               : i
             )} as TodoListDto;
           }
@@ -195,25 +218,44 @@ export class TasksComponent implements OnInit {
   cancelNewItem(): void {
     this.addingItem.set(false);
     this.newItemTitle = '';
+    this.newItemDueDate = '';
   }
 
+
   commitNewItem(): void {
-    this.addingItem.set(false);
     if (!this.newItemTitle.trim()) {
-      this.newItemTitle = '';
+      this.newItemError = 'Enter a task title first.';
       return;
     }
+    this.newItemError = '';
+    this.addingItem.set(false);
+
     const listId = this.selectedListId()!;
     const title = this.newItemTitle.trim();
-    this.itemsClient.createTodoItem({ title, listId } as CreateTodoItemCommand).subscribe({
+    let dueDate: Date | undefined;
+    if (this.newItemDueDate) {
+      dueDate = new Date(this.newItemDueDate + 'T00:00:00');
+    }
+
+    this.itemsClient.createTodoItem({ title, listId, dueDate } as CreateTodoItemCommand).subscribe({
       next: result => {
         this.lists.update(ls => ls.map(l => l.id === listId
-          ? { ...l, items: [...l.items, { id: result, listId, title, done: false, priority: this.priorityLevels()[0].id } as TodoItemDto] } as TodoListDto
+          ? {
+            ...l, items: [...l.items, {
+              id: result, listId, title, done: false,
+              priority: this.priorityLevels()[0].id, dueDate
+            } as TodoItemDto]
+          } as TodoListDto
           : l
         ));
         this.newItemTitle = '';
+        this.newItemDueDate = '';
       },
-      error: error => console.error(error)
+      error: err => {
+        console.error(err);
+        this.addingItem.set(true);
+        this.newItemError = 'Could not save task.';
+      }
     });
   }
 
@@ -285,15 +327,29 @@ export class TasksComponent implements OnInit {
     }
   }
 
-  readonly staticDueDate = new Date('2026-05-25');
+  // readonly staticDueDate = new Date('2026-05-25');
 
-  getDisplayDueDate(item: TodoItemDto): Date | null {
-    if (item.id === 0) return null;
-    return this.staticDueDate;
-  }
+  // getDisplayDueDate(item: TodoItemDto): Date | null {
+  //   if (item.id === 0) return null;
+  //   return this.staticDueDate;
+  // }
 
-  formatDueDate(date: Date | null): string {
+  // formatDueDate(date: Date | null): string {
+  //   if (!date) return '—';
+  //   return date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+  // }
+
+  formatDueDate(date: Date | null | undefined): string {
     if (!date) return '—';
     return date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+  }
+
+  isOverdue(item: TodoItemDto): boolean {
+    if (item.done || !item.dueDate) return false;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const due = new Date(item.dueDate);
+    due.setHours(0, 0, 0, 0);
+    return due < today;
   }
 }
