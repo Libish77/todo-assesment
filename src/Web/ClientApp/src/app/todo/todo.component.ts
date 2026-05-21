@@ -33,7 +33,7 @@ export class TasksComponent implements OnInit {
   newItemError = '';
   addingItem = signal(false);
   private originalTitle = '';
-
+  statusFilter = 'all';        
   constructor(
     private listsClient: TodoListsClient,
     private itemsClient: TodoItemsClient
@@ -223,8 +223,9 @@ export class TasksComponent implements OnInit {
 
 
   commitNewItem(): void {
+    //showing validation from angular not form api // will check this later...
     if (!this.newItemTitle.trim()) {
-      this.newItemError = 'Enter a task title first.';
+      this.newItemError = 'Title is required.';
       return;
     }
     this.newItemError = '';
@@ -254,6 +255,17 @@ export class TasksComponent implements OnInit {
       error: err => {
         console.error(err);
         this.addingItem.set(true);
+        try {
+          const errors = JSON.parse(err.response).errors;
+          if (errors?.Title?.[0]) {
+            this.newItemError = errors.Title[0];
+            return;
+          }
+          if (errors?.DueDate?.[0]) {
+            this.newItemError = errors.DueDate[0];
+            return;
+          }
+        } catch { }
         this.newItemError = 'Could not save task.';
       }
     });
@@ -327,23 +339,14 @@ export class TasksComponent implements OnInit {
     }
   }
 
-  // readonly staticDueDate = new Date('2026-05-25');
 
-  // getDisplayDueDate(item: TodoItemDto): Date | null {
-  //   if (item.id === 0) return null;
-  //   return this.staticDueDate;
-  // }
-
-  // formatDueDate(date: Date | null): string {
-  //   if (!date) return '—';
-  //   return date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
-  // }
 
   formatDueDate(date: Date | null | undefined): string {
     if (!date) return '—';
     return date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
   }
 
+  //checking if the date is overdue
   isOverdue(item: TodoItemDto): boolean {
     if (item.done || !item.dueDate) return false;
     const today = new Date();
@@ -351,5 +354,23 @@ export class TasksComponent implements OnInit {
     const due = new Date(item.dueDate);
     due.setHours(0, 0, 0, 0);
     return due < today;
+  }
+
+  //using filter in list
+  visibleItems(items: TodoItemDto[]): TodoItemDto[] {
+    return items.filter(item => {
+      if (this.statusFilter === 'active' && item.done) return false;
+      if (this.statusFilter === 'completed' && !item.done) return false;
+      return true;
+    });
+  }
+
+  //duedate shouldnot be past days
+  get todayForInput(): string {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
   }
 }
