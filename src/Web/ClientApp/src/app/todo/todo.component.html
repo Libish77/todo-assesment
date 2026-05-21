@@ -28,45 +28,67 @@
 
     <!-- Items panel -->
     @if (selectedList()) {
-      <div class="todo-main">
-        <div class="todo-panel-header">
-          <h2 [style.color]="selectedList()!.colour">{{ selectedList()!.title }}</h2>
-          <button class="icon-btn" (click)="showListOptionsDialog()"><lucide-icon name="settings" [size]="20" [strokeWidth]="2" /></button>
-        </div>
-
-        @for (item of selectedList()!.items; track $index; let i = $index) {
-          <div class="todo-item">
-            <input type="checkbox" [(ngModel)]="item.done" (change)="updateItem(item)" />
-            @if (item === editingItem()) {
-              <input id="{{ 'itemTitle' + i }}" type="text" class="todo-item-input"
-                [(ngModel)]="item.title" (keyup.enter)="updateItem(item)"
-                (keyup.escape)="cancelEdit(); $event.target.blur()"
-                (blur)="editingItem() && updateItem(item)"
-                autofocus maxlength="200" />
-            } @else {
-              <span class="todo-item-text" [class.todo-done]="item.done"
-                (click)="editItem(item, 'itemTitle' + i)">{{ item.title }}</span>
-            }
-            @if (item.id !== 0) {
-              <button class="icon-btn" (click)="showItemDetailsDialog(item)"><lucide-icon name="more-horizontal" [size]="20" [strokeWidth]="2" /></button>
-            }
-          </div>
+    <div class="todo-main">
+      <div class="todo-panel-header">
+        <h2 [style.color]="selectedList()!.colour">{{ selectedList()!.title }}</h2>
+        <button class="icon-btn" (click)="showListOptionsDialog()"><lucide-icon name="settings" [size]="20" [strokeWidth]="2" /></button>
+      </div>
+      <div class="todo-filters">
+        <select [(ngModel)]="statusFilter" aria-label="Filter by status">
+          <option value="all">All</option>
+          <option value="active">Active</option>
+          <option value="completed">Completed</option>
+        </select>
+      </div>
+      @for (item of visibleItems(selectedList()!.items); track $index; let i = $index) {
+      <div class="todo-item">
+        <input type="checkbox" [(ngModel)]="item.done" (change)="updateItem(item)" />
+        @if (item === editingItem()) {
+        <input id="{{ 'itemTitle' + i }}" type="text" class="todo-item-input"
+               [(ngModel)]="item.title" (keyup.enter)="updateItem(item)"
+               (keyup.escape)="cancelEdit(); $event.target.blur()"
+               (blur)="editingItem() && updateItem(item)"
+               autofocus maxlength="200" />
+        } @else {
+        <span class="todo-item-text" [class.todo-done]="item.done"
+              (click)="editItem(item, 'itemTitle' + i)">{{ item.title }}</span>
+        }
+        <small class="todo-due-date" [class.todo-overdue]="isOverdue(item)">
+          @if (isOverdue(item)) { Overdue · }
+          {{ formatDueDate(item.dueDate) }}
+        </small>
+        @if (item.id !== 0) {
+        <button class="icon-btn" (click)="showItemDetailsDialog(item)"><lucide-icon name="more-horizontal" [size]="20" [strokeWidth]="2" /></button>
         }
 
-        <div class="todo-item todo-new-item">
-          <input type="checkbox" disabled />
-          @if (addingItem()) {
-            <input id="newItemInput" type="text" class="todo-item-input"
-              [(ngModel)]="newItemTitle"
-              (keyup.enter)="commitNewItem()"
-              (keyup.escape)="cancelNewItem(); $event.target.blur()"
-              (blur)="addingItem() && commitNewItem()"
-              maxlength="200" />
-          } @else {
-            <span class="todo-item-text todo-new-item-placeholder" (click)="startAddingItem()">New task…</span>
+      </div>
+      }
+
+      <div class="todo-item todo-new-item">
+        <input type="checkbox" disabled />
+        @if (addingItem()) {
+        <div class="todo-new-wrap">
+          <div class="todo-new-row">
+            <input id="newItemInput" type="text"
+                   [(ngModel)]="newItemTitle"
+                   placeholder="New task"
+                   (keyup.enter)="commitNewItem()"
+                   (keyup.escape)="cancelNewItem()" />
+            <!--<input type="date" [(ngModel)]="newItemDueDate" />-->
+            <input type="date" [(ngModel)]="newItemDueDate" [min]="todayForInput" />
+            <button type="button" class="icon-btn" (click)="commitNewItem()" aria-label="Add task">
+              <lucide-icon name="check" [size]="20" [strokeWidth]="2" />
+            </button>
+          </div>
+          @if (newItemError) {
+          <small class="todo-new-error">{{ newItemError }}</small>
           }
         </div>
+        } @else {
+        <span class="todo-item-text todo-new-item-placeholder" (click)="startAddingItem()">New task…</span>
+        }
       </div>
+    </div>
     }
 
   </div>
@@ -156,17 +178,20 @@
     <label for="itemList">List</label>
     <select id="itemList" [(ngModel)]="itemDetailsEditor.listId">
       @for (list of lists(); track $index) {
-        <option [ngValue]="list.id">{{ list.title }}</option>
+      <option [ngValue]="list.id">{{ list.title }}</option>
       }
     </select>
     <label for="priority">Priority</label>
     <select id="priority" [(ngModel)]="itemDetailsEditor.priority">
       @for (level of priorityLevels(); track $index) {
-        <option [ngValue]="level.id">{{ level.title }}</option>
+      <option [ngValue]="level.id">{{ level.title }}</option>
       }
     </select>
     <label for="note">Note</label>
     <textarea id="note" rows="3" [(ngModel)]="itemDetailsEditor.note"></textarea>
+    <label for="dueDate">Due date</label>
+    <!--<input type="date" id="dueDate" [(ngModel)]="itemDetailsEditor.dueDateInput" />-->
+    <input type="date" [(ngModel)]="itemDetailsEditor.dueDateInput" [min]="todayForInput" />
     <footer>
       <button class="danger" style="margin-inline-end: auto" (click)="deleteItem(selectedItem()!)">Delete</button>
       <button class="secondary" (click)="closeItemDetailsDialog()">Cancel</button>
