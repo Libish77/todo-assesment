@@ -284,4 +284,16 @@ export class TasksComponent implements OnInit {
       });
     }
   }
+
+  readonly staticDueDate = new Date('2026-05-25');
+
+  getDisplayDueDate(item: TodoItemDto): Date | null {
+    if (item.id === 0) return null;
+    return this.staticDueDate;
+  }
+
+  formatDueDate(date: Date | null): string {
+    if (!date) return '—';
+    return date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+  }
 }

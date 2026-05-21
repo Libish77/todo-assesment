@@ -9,6 +9,7 @@ public class TodoItem : BaseAuditableEntity
     public string? Note { get; set; }
 
     public PriorityLevel Priority { get; set; }
+    public DateTime? DueDate { get; set; }
 
     private bool _done;
     public bool Done
@@ -26,4 +27,5 @@ public class TodoItem : BaseAuditableEntity
     }
 
     public TodoList List { get; set; } = null!;
+
 }
