@@ -43,4 +43,30 @@ public class CreateTodoItemTests : TestBase
         item.LastModifiedBy.ShouldBe(userId);
         item.LastModified.ShouldBe(DateTime.Now, TimeSpan.FromMilliseconds(10000));
     }
+
+    [Test]
+    public async Task ShouldCreateTodoItemWithDueDate()
+    {
+        await TestApp.RunAsDefaultUserAsync();
+
+        var listId = await TestApp.SendAsync(new CreateTodoListCommand
+        {
+            Title = "New List"
+        });
+
+        var dueDate = DateTime.Today.AddDays(7);
+
+        var itemId = await TestApp.SendAsync(new CreateTodoItemCommand
+        {
+            ListId = listId,
+            Title = "Task with due date",
+            DueDate = dueDate
+        });
+
+        var item = await TestApp.FindAsync<TodoItem>(itemId);
+
+        item.ShouldNotBeNull();
+        item!.DueDate.ShouldNotBeNull();
+        item.DueDate!.Value.Date.ShouldBe(dueDate.Date);
+    }
 }
